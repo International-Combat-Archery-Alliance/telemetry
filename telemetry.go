@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Options configure the OpenTelemetry initialization.
@@ -167,6 +168,18 @@ func InstrumentedHTTPClient() *http.Client {
 // API calls made with the given config.
 func InstrumentAWSConfig(cfg *aws.Config) {
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
+}
+
+// RunWithSpan executes fn inside a new span. If fn returns an error, the error
+// is recorded on the span before being returned.
+func RunWithSpan(ctx context.Context, tracer trace.Tracer, name string, fn func(context.Context) error) error {
+	ctx, span := tracer.Start(ctx, name)
+	defer span.End()
+	if err := fn(ctx); err != nil {
+		span.RecordError(err)
+		return err
+	}
+	return nil
 }
 
 func lambdaAttributes(info *LambdaInfo) []attribute.KeyValue {
